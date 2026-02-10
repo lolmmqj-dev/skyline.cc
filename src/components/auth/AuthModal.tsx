@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Mail, Lock, User, ArrowRight, Check, ShieldCheck, Loader2 } from 'lucide-react';
+import { X, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -42,6 +43,7 @@ const copy = {
             login: 'Ошибка входа',
             register: 'Ошибка регистрации',
             captcha: 'Пожалуйста, подтвердите капчу',
+            captchaConfig: 'Капча не настроена. Добавьте ключи в настройках.',
             network: 'Ошибка сети',
         },
     },
@@ -75,6 +77,7 @@ const copy = {
             login: 'Login failed',
             register: 'Registration failed',
             captcha: 'Please verify the captcha',
+            captchaConfig: 'Captcha is not configured. Add keys in settings.',
             network: 'Network error',
         },
     },
@@ -91,15 +94,24 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     const [password, setPassword] = useState('');
 
     const [isValidEmail, setIsValidEmail] = useState<boolean | null>(null);
-    const [captchaChecked, setCaptchaChecked] = useState(false);
-    const [captchaLoading, setCaptchaLoading] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+    const captchaRef = useRef<ReCAPTCHA | null>(null);
 
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
+    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+
     useEffect(() => {
         router.prefetch('/dashboard');
     }, [router]);
+
+    useEffect(() => {
+        if (isLogin) {
+            setCaptchaToken(null);
+            captchaRef.current?.reset();
+        }
+    }, [isLogin]);
 
     const validateEmail = (value: string) => {
         const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -116,13 +128,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         }
     };
 
-    const handleCaptchaClick = () => {
-        if (captchaChecked || captchaLoading) return;
-        setCaptchaLoading(true);
-        setTimeout(() => {
-            setCaptchaLoading(false);
-            setCaptchaChecked(true);
-        }, 500);
+    const handleCaptchaChange = (token: string | null) => {
+        setCaptchaToken(token);
+        if (token) {
+            setErrorMessage('');
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -151,7 +161,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     setErrorMessage(data.message || t.errors.login);
                 }
             } else {
-                if (!captchaChecked) {
+                if (!siteKey) {
+                    setErrorMessage(t.errors.captchaConfig);
+                    setLoading(false);
+                    return;
+                }
+                if (!captchaToken) {
                     setErrorMessage(t.errors.captcha);
                     setLoading(false);
                     return;
@@ -160,7 +175,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 const res = await fetch('/api/auth/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password, username }),
+                    body: JSON.stringify({ email, password, username, captchaToken }),
                 });
                 const data = await res.json();
 
@@ -174,10 +189,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     router.refresh();
                 } else {
                     setErrorMessage(data.message || t.errors.register);
+                    captchaRef.current?.reset();
+                    setCaptchaToken(null);
                 }
             }
         } catch (err) {
             setErrorMessage(t.errors.network);
+            captchaRef.current?.reset();
+            setCaptchaToken(null);
         } finally {
             setLoading(false);
         }
@@ -263,20 +282,20 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                             </div>
 
                             {!isLogin && (
-                                <div className="captcha-container mt-2 cursor-pointer" onClick={handleCaptchaClick}>
-                                    <div
-                                        className={`captcha-checkbox ${captchaChecked ? 'checked' : ''} ${
-                                            captchaLoading ? 'loading' : ''
-                                        }`}
-                                    >
-                                        {captchaLoading && <div className="spinner"></div>}
-                                        {captchaChecked && <Check size={18} className="text-green-600" strokeWidth={4} />}
-                                    </div>
-                                    <span className="captcha-label">{t.captcha.label}</span>
-                                    <div className="captcha-logo">
-                                        <ShieldCheck size={28} className="text-gray-400" />
-                                        <span>reCAPTCHA</span>
-                                    </div>
+                                <div className="mt-2 flex justify-center">
+                                    {siteKey ? (
+                                        <ReCAPTCHA
+                                            ref={captchaRef}
+                                            sitekey={siteKey}
+                                            onChange={handleCaptchaChange}
+                                            onExpired={() => setCaptchaToken(null)}
+                                            theme="dark"
+                                        />
+                                    ) : (
+                                        <div className="text-sm text-red-400 text-center">
+                                            {t.errors.captchaConfig}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

@@ -7,10 +7,30 @@ function generateHWID() {
 
 export async function POST(req: Request) {
     try {
-        const { email, password, username } = await req.json();
+        const { email, password, username, captchaToken } = await req.json();
 
         if (!email || !password || !username) {
             return NextResponse.json({ success: false, message: 'Missing fields' }, { status: 400 });
+        }
+
+        if (!captchaToken) {
+            return NextResponse.json({ success: false, message: 'Captcha required' }, { status: 400 });
+        }
+
+        const secret = process.env.RECAPTCHA_SECRET_KEY;
+        if (!secret) {
+            return NextResponse.json({ success: false, message: 'Captcha not configured' }, { status: 500 });
+        }
+
+        const captchaRes = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ secret, response: captchaToken }),
+        });
+        const captchaData = await captchaRes.json();
+
+        if (!captchaData.success) {
+            return NextResponse.json({ success: false, message: 'Captcha failed' }, { status: 400 });
         }
 
         const db = getDb();
