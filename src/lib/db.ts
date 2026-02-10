@@ -1,7 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
-const DB_PATH = path.join(process.cwd(), 'src', 'data', 'db.json');
+const PRIMARY_DB_PATH = path.join(process.cwd(), 'src', 'data', 'db.json');
+const FALLBACK_DB_PATH = path.join(os.tmpdir(), 'skyline-db.json');
 
 const DEFAULT_PROMOS = [
     { code: 'mind', discount: 10 },
@@ -9,8 +11,14 @@ const DEFAULT_PROMOS = [
     { code: 'skyline', discount: 10 }
 ];
 
+function resolveDbPath() {
+    if (fs.existsSync(FALLBACK_DB_PATH)) return FALLBACK_DB_PATH;
+    return PRIMARY_DB_PATH;
+}
+
 export function getDb() {
-    if (!fs.existsSync(DB_PATH)) {
+    const dbPath = resolveDbPath();
+    if (!fs.existsSync(dbPath)) {
         return {
             users: [],
             keys: [],
@@ -18,7 +26,7 @@ export function getDb() {
             promoCodes: DEFAULT_PROMOS
         };
     }
-    const data = fs.readFileSync(DB_PATH, 'utf-8');
+    const data = fs.readFileSync(dbPath, 'utf-8');
     const db = JSON.parse(data);
 
     // Ensure new fields exist
@@ -29,5 +37,13 @@ export function getDb() {
 }
 
 export function saveDb(data: any) {
-    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+    const payload = JSON.stringify(data, null, 2);
+    try {
+        fs.mkdirSync(path.dirname(PRIMARY_DB_PATH), { recursive: true });
+        fs.writeFileSync(PRIMARY_DB_PATH, payload);
+        return;
+    } catch {
+        fs.mkdirSync(path.dirname(FALLBACK_DB_PATH), { recursive: true });
+        fs.writeFileSync(FALLBACK_DB_PATH, payload);
+    }
 }
