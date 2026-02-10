@@ -218,7 +218,7 @@ export default function Dashboard() {
                         {user?.uid && <div className="text-xs text-gray-400 mt-1">UID {user.uid}</div>}
                     </div>
                     <div className="flex items-center gap-3">
-                        {(user?.uid === 1 || user?.uid === 2) && (
+                        {user?.uid === 1 && (
                             <Link href="/admin" className="btn-ghost text-sm">
                                 {lang === 'ru' ? 'Админ панель' : 'Admin Panel'}
                             </Link>

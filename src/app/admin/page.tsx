@@ -53,7 +53,7 @@ export default function AdminPage() {
             return;
         }
         const parsed = JSON.parse(stored);
-        if (!parsed?.uid || (parsed.uid !== 1 && parsed.uid !== 2)) {
+        if (!parsed?.uid || parsed.uid !== 1) {
             router.replace('/');
             return;
         }

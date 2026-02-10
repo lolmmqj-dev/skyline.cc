@@ -44,5 +44,5 @@ export async function getSessionUser(req: Request): Promise<SessionUser | null> 
 }
 
 export function isAdmin(uid: number | undefined | null) {
-    return uid === 1 || uid === 2;
+    return uid === 1;
 }
