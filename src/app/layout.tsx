@@ -4,6 +4,7 @@ import './globals.css'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { LanguageProvider } from '@/components/i18n/LanguageProvider'
+import EntryGate from '@/components/captcha/EntryGate'
 
 const unbounded = Unbounded({
     subsets: ['latin', 'cyrillic'],
@@ -26,11 +27,13 @@ export default function RootLayout({
                 <LanguageProvider>
                     <div className="bg-gradient-1" />
                     <div className="bg-gradient-2" />
-                    <Navbar />
-                    <main className="min-h-screen pt-20">
-                        {children}
-                    </main>
-                    <Footer />
+                    <EntryGate>
+                        <Navbar />
+                        <main className="min-h-screen pt-20">
+                            {children}
+                        </main>
+                        <Footer />
+                    </EntryGate>
                 </LanguageProvider>
             </body>
         </html>
