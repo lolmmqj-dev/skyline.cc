@@ -64,7 +64,8 @@ export default function Dashboard() {
     const [key, setKey] = useState('');
     const [message, setMessage] = useState('');
     const [isSuccess, setIsSuccess] = useState(false);
-    const [avatarUrl, setAvatarUrl] = useState('');
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [avatarPreview, setAvatarPreview] = useState<string>('');
     const [avatarMessage, setAvatarMessage] = useState('');
 
     useEffect(() => {
@@ -96,7 +97,7 @@ export default function Dashboard() {
         };
 
         setUser(normalizedUser);
-        setAvatarUrl(normalizedUser.avatar_url || '');
+        setAvatarPreview(normalizedUser.avatar_url || '');
         setLoading(false);
     }, [router]);
 
@@ -144,21 +145,31 @@ export default function Dashboard() {
     const handleAvatarSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setAvatarMessage('');
+        if (!avatarFile) {
+            setAvatarMessage(lang === 'ru' ? 'Выберите файл' : 'Choose a file');
+            return;
+        }
         try {
             const token = localStorage.getItem('skyline_session');
+            const form = new FormData();
+            form.append('file', avatarFile);
             const res = await fetch('/api/user/avatar', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
-                body: JSON.stringify({ avatarUrl }),
+                body: form,
             });
             const data = await res.json();
             if (data.success) {
                 const updatedUser = { ...user, avatar_url: data.avatarUrl };
                 setUser(updatedUser);
                 localStorage.setItem('skyline_user', JSON.stringify(updatedUser));
+                setAvatarFile(null);
+                if (avatarPreview && avatarPreview.startsWith('blob:')) {
+                    URL.revokeObjectURL(avatarPreview);
+                }
+                setAvatarPreview(data.avatarUrl);
                 setAvatarMessage(lang === 'ru' ? 'Аватар обновлен' : 'Avatar updated');
             } else {
                 setAvatarMessage(data.message || (lang === 'ru' ? 'Ошибка' : 'Error'));
@@ -290,9 +301,9 @@ export default function Dashboard() {
                 >
                     <div className="flex items-center gap-4 mb-6">
                         <div className="w-16 h-16 rounded-full overflow-hidden bg-white/10 flex items-center justify-center">
-                            {user.avatar_url ? (
+                            {avatarPreview ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                             ) : (
                                 <span className="text-gray-500 text-sm">No Avatar</span>
                             )}
@@ -300,20 +311,32 @@ export default function Dashboard() {
                         <div>
                             <h2 className="text-2xl font-bold">{lang === 'ru' ? 'Аватар' : 'Avatar'}</h2>
                             <p className="text-gray-400 text-sm">
-                                {lang === 'ru' ? 'Вставьте ссылку на изображение.' : 'Paste an image URL.'}
+                                {lang === 'ru'
+                                    ? 'Загрузите изображение с устройства (до 2 МБ).'
+                                    : 'Upload an image from your device (max 2 MB).'}
                             </p>
                         </div>
                     </div>
 
                     <form onSubmit={handleAvatarSave} className="max-w-md">
                         <input
-                            type="url"
-                            placeholder="https://..."
-                            value={avatarUrl}
-                            onChange={(e) => setAvatarUrl(e.target.value)}
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                setAvatarFile(file);
+                                if (avatarPreview && avatarPreview.startsWith('blob:')) {
+                                    URL.revokeObjectURL(avatarPreview);
+                                }
+                                if (file) {
+                                    setAvatarPreview(URL.createObjectURL(file));
+                                } else {
+                                    setAvatarPreview(user.avatar_url || '');
+                                }
+                            }}
                             className="form-input mb-3"
                         />
-                        <button className="btn-primary w-full" disabled={!avatarUrl}>
+                        <button className="btn-primary w-full" disabled={!avatarFile}>
                             {lang === 'ru' ? 'Сохранить' : 'Save'}
                         </button>
                         {avatarMessage && (
