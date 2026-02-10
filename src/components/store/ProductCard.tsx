@@ -11,7 +11,7 @@ interface ProductProps {
     title: string;
     price: string;
     description: string;
-    features: string[];
+    features: ReadonlyArray<string>;
     popular?: boolean;
     delay?: number;
 }
