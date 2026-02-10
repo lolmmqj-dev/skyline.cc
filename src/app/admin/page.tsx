@@ -44,6 +44,7 @@ export default function AdminPage() {
     const [ipBan, setIpBan] = useState('');
     const [ipReason, setIpReason] = useState('');
     const [grantDays, setGrantDays] = useState<Record<number, number>>({});
+    const [uidEdits, setUidEdits] = useState<Record<number, string>>({});
 
     const [token, setToken] = useState<string | null>(null);
 
@@ -127,6 +128,27 @@ export default function AdminPage() {
             body: JSON.stringify({ uid }),
         });
         fetchUsers();
+    };
+
+    const handleChangeUid = async (oldUid: number) => {
+        const raw = uidEdits[oldUid];
+        const newUid = Number(raw);
+        if (!raw || Number.isNaN(newUid) || newUid <= 0 || newUid === oldUid) {
+            return;
+        }
+        const res = await fetch('/api/admin/users/uid', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ oldUid, newUid }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            setUidEdits((prev) => ({ ...prev, [oldUid]: '' }));
+            fetchUsers();
+        }
     };
 
     const handleGenerateKeys = async () => {
@@ -261,6 +283,26 @@ export default function AdminPage() {
                                                     >
                                                         <CheckCircle size={14} /> Grant
                                                     </button>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="number"
+                                                            value={uidEdits[u.uid] ?? ''}
+                                                            onChange={(e) =>
+                                                                setUidEdits((prev) => ({
+                                                                    ...prev,
+                                                                    [u.uid]: e.target.value,
+                                                                }))
+                                                            }
+                                                            className="bg-black/30 border border-white/10 rounded px-2 py-1 text-xs w-24"
+                                                            placeholder="New UID"
+                                                        />
+                                                        <button
+                                                            className="btn-ghost text-xs"
+                                                            onClick={() => handleChangeUid(u.uid)}
+                                                        >
+                                                            Set UID
+                                                        </button>
+                                                    </div>
                                                     {u.is_banned ? (
                                                         <button className="btn-ghost text-xs" onClick={() => handleUnbanUser(u.uid)}>
                                                             <Shield size={14} /> Unban
