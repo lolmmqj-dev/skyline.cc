@@ -29,6 +29,7 @@ const DAY_OPTIONS = [
     { label: '30 days', value: 30 },
     { label: '90 days', value: 90 },
     { label: 'Lifetime', value: 0 },
+    { label: 'Remove', value: -1 },
 ];
 
 export default function AdminPage() {

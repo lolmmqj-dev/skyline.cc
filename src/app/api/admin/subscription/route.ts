@@ -14,6 +14,14 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, message: 'Missing data' }, { status: 400 });
         }
 
+        if (days === -1) {
+            await supabaseAdmin
+                .from('users')
+                .update({ subscription_status: 'inactive', subscription_expires: null })
+                .eq('uid', uid);
+            return NextResponse.json({ success: true, expiry: null });
+        }
+
         const { data: user } = await supabaseAdmin
             .from('users')
             .select('subscription_expires')
