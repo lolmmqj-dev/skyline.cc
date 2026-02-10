@@ -62,7 +62,9 @@ export default function RecentSignups() {
 
         return () => {
             isMounted = false;
-            supabaseBrowser.removeChannel(channel);
+            if (supabaseBrowser) {
+                supabaseBrowser.removeChannel(channel);
+            }
         };
     }, []);
 
