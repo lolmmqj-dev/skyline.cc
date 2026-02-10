@@ -1,49 +1,52 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
+import { getSessionUser } from '@/lib/auth';
 
 export async function POST(req: Request) {
     try {
-        const { email, key } = await req.json();
+        const { key } = await req.json();
 
-        if (!email || !key) {
-            return NextResponse.json({ success: false, message: 'Missing email or key' }, { status: 400 });
+        if (!key) {
+            return NextResponse.json({ success: false, message: 'Missing key' }, { status: 400 });
         }
 
-        const db = getDb();
-
-        // 1. Find User
-        const userIndex = db.users.findIndex((u: any) => u.email === email);
-        if (userIndex === -1) {
-            return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
+        const user = await getSessionUser(req);
+        if (!user) {
+            return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
         }
 
-        // 2. Validate Key
-        const keyIndex = db.keys.findIndex((k: any) => k.code === key);
-        if (keyIndex === -1) {
+        const { data: keyRow } = await supabaseAdmin
+            .from('keys')
+            .select('id, duration_days, used_by')
+            .eq('code', key)
+            .maybeSingle();
+
+        if (!keyRow) {
             return NextResponse.json({ success: false, message: 'Invalid key' }, { status: 400 });
         }
 
-        if (db.keys[keyIndex].used) {
+        if (keyRow.used_by) {
             return NextResponse.json({ success: false, message: 'Key already used' }, { status: 400 });
         }
 
-        // 3. Redeem Key
-        db.keys[keyIndex].used = true;
-        db.keys[keyIndex].usedBy = email;
-
-        // 4. Update User Subscription
-        // Add 30 days to current expiry or now
         const now = new Date();
-        const currentExpiry = new Date(db.users[userIndex].subscriptionExpires || now);
-        // If expired, start from now
+        const currentExpiry = user.subscription_expires ? new Date(user.subscription_expires) : now;
         const baseDate = currentExpiry > now ? currentExpiry : now;
+        const days = keyRow.duration_days === 0 ? 3650 : keyRow.duration_days;
+        const newExpiry = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000);
 
-        const newExpiry = new Date(baseDate.getTime() + (30 * 24 * 60 * 60 * 1000)); // +30 days
+        await supabaseAdmin
+            .from('keys')
+            .update({ used_by: user.uid, used_at: new Date().toISOString() })
+            .eq('id', keyRow.id);
 
-        db.users[userIndex].subscriptionExpires = newExpiry.toISOString();
-        db.users[userIndex].subscriptionStatus = 'active';
-
-        saveDb(db);
+        await supabaseAdmin
+            .from('users')
+            .update({
+                subscription_status: 'active',
+                subscription_expires: newExpiry.toISOString(),
+            })
+            .eq('uid', user.uid);
 
         return NextResponse.json({
             success: true,

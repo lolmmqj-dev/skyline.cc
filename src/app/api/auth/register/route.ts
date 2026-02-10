@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb } from '@/lib/db';
+import bcrypt from 'bcryptjs';
+import { supabaseAdmin } from '@/lib/supabase';
+import { createSessionToken } from '@/lib/auth';
+import { getClientIp } from '@/lib/request';
+import { promises as dns } from 'dns';
 
 function generateHWID() {
     return 'HWID-' + Math.random().toString(36).substring(2, 15).toUpperCase();
@@ -33,28 +37,81 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, message: 'Captcha failed' }, { status: 400 });
         }
 
-        const db = getDb();
+        const normalizedEmail = String(email).trim().toLowerCase();
 
-        if (db.users.find((u: any) => u.email === email)) {
+        // Validate email format + MX records (basic real-world check)
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(normalizedEmail)) {
+            return NextResponse.json({ success: false, message: 'Invalid email' }, { status: 400 });
+        }
+
+        const domain = normalizedEmail.split('@')[1];
+        try {
+            const mx = await dns.resolveMx(domain);
+            if (!mx || mx.length === 0) {
+                return NextResponse.json({ success: false, message: 'Email domain is not valid' }, { status: 400 });
+            }
+        } catch {
+            return NextResponse.json({ success: false, message: 'Email domain is not valid' }, { status: 400 });
+        }
+
+        const ip = getClientIp(req);
+
+        const { data: ipBan } = await supabaseAdmin
+            .from('ip_bans')
+            .select('id')
+            .eq('ip', ip)
+            .maybeSingle();
+
+        if (ipBan) {
+            return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 });
+        }
+
+        const { data: existing } = await supabaseAdmin
+            .from('users')
+            .select('uid')
+            .eq('email', normalizedEmail)
+            .maybeSingle();
+
+        if (existing) {
             return NextResponse.json({ success: false, message: 'Email already registered' }, { status: 400 });
         }
 
-        const newUser = {
-            id: Date.now().toString(),
-            username,
-            email,
-            password, // In a real app, hash this!
-            hwid: generateHWID(),
-            subscriptionStatus: 'inactive',
-            subscriptionExpires: null,
-            joinDate: new Date().toISOString()
-        };
+        const passwordHash = await bcrypt.hash(password, 10);
 
-        db.users.push(newUser);
-        saveDb(db);
+        const { data: createdUser, error: createError } = await supabaseAdmin
+            .from('users')
+            .insert({
+                username,
+                email: normalizedEmail,
+                password_hash: passwordHash,
+                hwid: generateHWID(),
+                subscription_status: 'inactive',
+                subscription_expires: null,
+                last_ip: ip,
+            })
+            .select('uid, email, username, subscription_status, subscription_expires, avatar_url')
+            .single();
 
-        const { password: _, ...userWithoutPassword } = newUser;
-        return NextResponse.json({ success: true, user: userWithoutPassword });
+        if (createError || !createdUser) {
+            return NextResponse.json({ success: false, message: 'Registration failed' }, { status: 500 });
+        }
+
+        const token = createSessionToken();
+        const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
+        await supabaseAdmin
+            .from('sessions')
+            .insert({
+                user_uid: createdUser.uid,
+                token,
+                expires_at: expiresAt,
+            });
+
+        return NextResponse.json({
+            success: true,
+            user: createdUser,
+            sessionToken: token,
+        });
 
     } catch (error) {
         return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 });

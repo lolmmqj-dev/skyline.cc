@@ -1,52 +1,50 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
+import { getSessionUser } from '@/lib/auth';
 
 export async function POST(req: Request) {
     try {
-        const { orderId, email, planId } = await req.json();
+        const { orderId, planId } = await req.json();
 
-        if (!orderId || !email) {
+        if (!orderId || !planId) {
             return NextResponse.json({ success: false, message: 'Missing data' }, { status: 400 });
         }
 
-        // Simulate banking verification delay
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        const db = getDb();
-
-        // 1. Find User
-        const userIndex = db.users.findIndex((u: any) => u.email === email);
-        if (userIndex === -1) {
-            return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
+        const user = await getSessionUser(req);
+        if (!user) {
+            return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
         }
 
-        // 2. Record Order
-        const newOrder = {
-            id: orderId,
-            email,
-            planId,
-            date: new Date().toISOString(),
-            status: 'completed',
-            amount: 'PAID' // Simplified
-        };
-        db.orders.push(newOrder);
+        // Simulate banking verification delay
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // 3. Activate Subscription (Simulated logic: 30 days for everyone for demo)
         const now = new Date();
-        const currentExpiry = new Date(db.users[userIndex].subscriptionExpires || now);
+        const currentExpiry = user.subscription_expires ? new Date(user.subscription_expires) : now;
         const baseDate = currentExpiry > now ? currentExpiry : now;
 
-        // Determine duration based on planId (simplified)
         let days = 30;
         if (planId === '3_months') days = 90;
-        if (planId === 'forever') days = 3650; // 10 years
+        if (planId === 'forever') days = 3650;
 
         const newExpiry = new Date(baseDate.getTime() + (days * 24 * 60 * 60 * 1000));
 
-        db.users[userIndex].subscriptionExpires = newExpiry.toISOString();
-        db.users[userIndex].subscriptionStatus = 'active';
+        await supabaseAdmin
+            .from('orders')
+            .insert({
+                order_id: orderId,
+                user_uid: user.uid,
+                plan_id: planId,
+                status: 'completed',
+                amount: 'PAID',
+            });
 
-        saveDb(db);
+        await supabaseAdmin
+            .from('users')
+            .update({
+                subscription_status: 'active',
+                subscription_expires: newExpiry.toISOString(),
+            })
+            .eq('uid', user.uid);
 
         return NextResponse.json({
             success: true,

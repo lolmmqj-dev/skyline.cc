@@ -25,6 +25,10 @@ const copy = {
         },
         validation: {
             invalidEmail: 'Некорректный email',
+            checking: 'Проверяем email...',
+            available: 'Email доступен',
+            taken: 'Email уже используется',
+            domainInvalid: 'Домен почты недоступен',
         },
         captcha: {
             label: 'Я не робот',
@@ -59,6 +63,10 @@ const copy = {
         },
         validation: {
             invalidEmail: 'Invalid email',
+            checking: 'Checking email...',
+            available: 'Email is available',
+            taken: 'Email is already used',
+            domainInvalid: 'Email domain is not valid',
         },
         captcha: {
             label: "I'm not a robot",
@@ -94,8 +102,10 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     const [password, setPassword] = useState('');
 
     const [isValidEmail, setIsValidEmail] = useState<boolean | null>(null);
+    const [emailCheck, setEmailCheck] = useState<'idle' | 'checking' | 'available' | 'taken' | 'domain' | 'error'>('idle');
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
     const captchaRef = useRef<InstanceType<typeof ReCAPTCHA> | null>(null);
+    const emailCheckTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
@@ -110,6 +120,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         if (isLogin) {
             setCaptchaToken(null);
             captchaRef.current?.reset();
+            setEmailCheck('idle');
         }
     }, [isLogin]);
 
@@ -122,9 +133,40 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         const val = e.target.value;
         setEmail(val);
         if (val.length > 0) {
-            setIsValidEmail(validateEmail(val));
+            const valid = validateEmail(val);
+            setIsValidEmail(valid);
+            if (!isLogin && valid) {
+                setEmailCheck('checking');
+                if (emailCheckTimeout.current) {
+                    clearTimeout(emailCheckTimeout.current);
+                }
+                emailCheckTimeout.current = setTimeout(async () => {
+                    try {
+                        const res = await fetch('/api/auth/check-email', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: val }),
+                        });
+                        const data = await res.json();
+                        if (data.ok) {
+                            setEmailCheck('available');
+                        } else if (data.reason === 'taken') {
+                            setEmailCheck('taken');
+                        } else if (data.reason === 'domain') {
+                            setEmailCheck('domain');
+                        } else {
+                            setEmailCheck('error');
+                        }
+                    } catch {
+                        setEmailCheck('error');
+                    }
+                }, 500);
+            } else if (!isLogin) {
+                setEmailCheck('idle');
+            }
         } else {
             setIsValidEmail(null);
+            setEmailCheck('idle');
         }
     };
 
@@ -150,7 +192,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 const data = await res.json();
 
                 if (data.success) {
-                    localStorage.setItem('skyline_user', JSON.stringify(data.user));
+                    const stored = { ...data.user, sessionToken: data.sessionToken };
+                    localStorage.setItem('skyline_user', JSON.stringify(stored));
+                    if (data.sessionToken) {
+                        localStorage.setItem('skyline_session', data.sessionToken);
+                    }
                     if (typeof window !== 'undefined') {
                         window.dispatchEvent(new Event('skyline-auth'));
                     }
@@ -171,6 +217,21 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     setLoading(false);
                     return;
                 }
+                if (emailCheck === 'taken') {
+                    setErrorMessage(t.validation.taken);
+                    setLoading(false);
+                    return;
+                }
+                if (emailCheck === 'domain') {
+                    setErrorMessage(t.validation.domainInvalid);
+                    setLoading(false);
+                    return;
+                }
+                if (emailCheck === 'error') {
+                    setErrorMessage(t.errors.network);
+                    setLoading(false);
+                    return;
+                }
 
                 const res = await fetch('/api/auth/register', {
                     method: 'POST',
@@ -180,7 +241,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 const data = await res.json();
 
                 if (data.success) {
-                    localStorage.setItem('skyline_user', JSON.stringify(data.user));
+                    const stored = { ...data.user, sessionToken: data.sessionToken };
+                    localStorage.setItem('skyline_user', JSON.stringify(stored));
+                    if (data.sessionToken) {
+                        localStorage.setItem('skyline_session', data.sessionToken);
+                    }
                     if (typeof window !== 'undefined') {
                         window.dispatchEvent(new Event('skyline-auth'));
                     }
@@ -265,6 +330,23 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                                 {isValidEmail === false && (
                                     <span className="text-red-500 text-xs absolute -bottom-5 left-2">
                                         {t.validation.invalidEmail}
+                                    </span>
+                                )}
+                                {!isLogin && isValidEmail && emailCheck !== 'idle' && (
+                                    <span
+                                        className={`text-xs absolute -bottom-5 left-2 ${
+                                            emailCheck === 'available'
+                                                ? 'text-green-400'
+                                                : emailCheck === 'checking'
+                                                    ? 'text-gray-400'
+                                                    : 'text-red-400'
+                                        }`}
+                                    >
+                                        {emailCheck === 'checking' && t.validation.checking}
+                                        {emailCheck === 'available' && t.validation.available}
+                                        {emailCheck === 'taken' && t.validation.taken}
+                                        {emailCheck === 'domain' && t.validation.domainInvalid}
+                                        {emailCheck === 'error' && t.errors.network}
                                     </span>
                                 )}
                             </div>

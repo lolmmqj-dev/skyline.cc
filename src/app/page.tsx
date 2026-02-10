@@ -1,6 +1,7 @@
 'use client';
 
 import Hero from '@/components/home/Hero';
+import RecentSignups from '@/components/home/RecentSignups';
 import ProductCard from '@/components/store/ProductCard';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 
@@ -198,6 +199,8 @@ export default function Home() {
                     ))}
                 </div>
             </section>
+
+            <RecentSignups />
 
             <section id="about" className="container mx-auto px-4">
                 <div className="text-center mb-12">

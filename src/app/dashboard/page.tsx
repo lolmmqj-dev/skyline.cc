@@ -64,6 +64,8 @@ export default function Dashboard() {
     const [key, setKey] = useState('');
     const [message, setMessage] = useState('');
     const [isSuccess, setIsSuccess] = useState(false);
+    const [avatarUrl, setAvatarUrl] = useState('');
+    const [avatarMessage, setAvatarMessage] = useState('');
 
     useEffect(() => {
         const storedUser = localStorage.getItem('skyline_user');
@@ -88,17 +90,19 @@ export default function Dashboard() {
         }
 
         const normalizedUser = {
-            subscriptionStatus: 'inactive',
-            subscriptionExpires: null,
+            subscription_status: parsed.subscription_status ?? parsed.subscriptionStatus ?? 'inactive',
+            subscription_expires: parsed.subscription_expires ?? parsed.subscriptionExpires ?? null,
             ...parsed,
         };
 
         setUser(normalizedUser);
+        setAvatarUrl(normalizedUser.avatar_url || '');
         setLoading(false);
     }, [router]);
 
     const handleLogout = () => {
         localStorage.removeItem('skyline_user');
+        localStorage.removeItem('skyline_session');
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new Event('skyline-auth'));
         }
@@ -111,17 +115,21 @@ export default function Dashboard() {
         setIsSuccess(false);
 
         try {
+            const token = localStorage.getItem('skyline_session');
             const res = await fetch('/api/keys/redeem', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: user.email, key }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({ key }),
             });
             const data = await res.json();
 
             if (data.success) {
                 setIsSuccess(true);
                 setMessage(t.messages.success);
-                const updatedUser = { ...user, subscriptionStatus: 'active', subscriptionExpires: data.expiry };
+                const updatedUser = { ...user, subscription_status: 'active', subscription_expires: data.expiry };
                 setUser(updatedUser);
                 localStorage.setItem('skyline_user', JSON.stringify(updatedUser));
                 setKey('');
@@ -133,22 +141,52 @@ export default function Dashboard() {
         }
     };
 
+    const handleAvatarSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setAvatarMessage('');
+        try {
+            const token = localStorage.getItem('skyline_session');
+            const res = await fetch('/api/user/avatar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({ avatarUrl }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                const updatedUser = { ...user, avatar_url: data.avatarUrl };
+                setUser(updatedUser);
+                localStorage.setItem('skyline_user', JSON.stringify(updatedUser));
+                setAvatarMessage(lang === 'ru' ? 'Аватар обновлен' : 'Avatar updated');
+            } else {
+                setAvatarMessage(data.message || (lang === 'ru' ? 'Ошибка' : 'Error'));
+            }
+        } catch {
+            setAvatarMessage(lang === 'ru' ? 'Ошибка сети' : 'Network error');
+        }
+    };
+
     if (loading || !user) {
         return <div className="min-h-screen bg-black flex items-center justify-center">{t.loading}</div>;
     }
 
-    const isActive = user.subscriptionStatus === 'active';
-    const expiryDate = user.subscriptionExpires
-        ? new Date(user.subscriptionExpires).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US')
+    const isActive = user.subscription_status === 'active';
+    const expiryDate = user.subscription_expires
+        ? new Date(user.subscription_expires).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US')
         : t.noExpiry;
 
     return (
         <div className="min-h-screen pt-24 px-4 pb-10">
             <div className="max-w-4xl mx-auto">
                 <div className="flex justify-between items-center mb-10">
-                    <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">
-                        {t.title}
-                    </h1>
+                    <div>
+                        <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">
+                            {t.title}
+                        </h1>
+                        {user?.uid && <div className="text-xs text-gray-400 mt-1">UID {user.uid}</div>}
+                    </div>
                     <button onClick={handleLogout} className="btn-ghost flex items-center gap-2 text-sm">
                         <LogOut size={16} /> {t.logout}
                     </button>
@@ -240,6 +278,48 @@ export default function Dashboard() {
                             >
                                 {message}
                             </motion.div>
+                        )}
+                    </form>
+                </motion.div>
+
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.35 }}
+                    className="card-custom p-8 mt-8"
+                >
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="w-16 h-16 rounded-full overflow-hidden bg-white/10 flex items-center justify-center">
+                            {user.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-gray-500 text-sm">No Avatar</span>
+                            )}
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-bold">{lang === 'ru' ? 'Аватар' : 'Avatar'}</h2>
+                            <p className="text-gray-400 text-sm">
+                                {lang === 'ru' ? 'Вставьте ссылку на изображение.' : 'Paste an image URL.'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleAvatarSave} className="max-w-md">
+                        <input
+                            type="url"
+                            placeholder="https://..."
+                            value={avatarUrl}
+                            onChange={(e) => setAvatarUrl(e.target.value)}
+                            className="form-input mb-3"
+                        />
+                        <button className="btn-primary w-full" disabled={!avatarUrl}>
+                            {lang === 'ru' ? 'Сохранить' : 'Save'}
+                        </button>
+                        {avatarMessage && (
+                            <div className="mt-3 text-sm text-gray-300 text-center">
+                                {avatarMessage}
+                            </div>
                         )}
                     </form>
                 </motion.div>

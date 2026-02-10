@@ -129,19 +129,22 @@ export default function PaymentModal({ isOpen, onClose, plan }: PaymentModalProp
         const user = JSON.parse(userStr);
 
         try {
+            const token = localStorage.getItem('skyline_session');
             const res = await fetch('/api/payment/verify', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
                 body: JSON.stringify({
                     orderId: `ORD-${Date.now()}`,
-                    email: user.email,
                     planId: plan.id,
                 }),
             });
             const data = await res.json();
 
             if (data.success) {
-                const updatedUser = { ...user, subscriptionStatus: 'active', subscriptionExpires: data.expiry };
+                const updatedUser = { ...user, subscription_status: 'active', subscription_expires: data.expiry };
                 localStorage.setItem('skyline_user', JSON.stringify(updatedUser));
                 if (typeof window !== 'undefined') {
                     window.dispatchEvent(new Event('skyline-auth'));
