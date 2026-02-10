@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Shield, Key, Calendar, Activity, Lock, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -209,16 +210,23 @@ export default function Dashboard() {
     return (
         <div className="min-h-screen pt-24 px-4 pb-10">
             <div className="max-w-4xl mx-auto">
-                <div className="flex justify-between items-center mb-10">
+                <div className="flex justify-between items-center mb-10 gap-4">
                     <div>
                         <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">
                             {t.title}
                         </h1>
                         {user?.uid && <div className="text-xs text-gray-400 mt-1">UID {user.uid}</div>}
                     </div>
-                    <button onClick={handleLogout} className="btn-ghost flex items-center gap-2 text-sm">
-                        <LogOut size={16} /> {t.logout}
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {(user?.uid === 1 || user?.uid === 2) && (
+                            <Link href="/admin" className="btn-ghost text-sm">
+                                {lang === 'ru' ? 'Админ панель' : 'Admin Panel'}
+                            </Link>
+                        )}
+                        <button onClick={handleLogout} className="btn-ghost flex items-center gap-2 text-sm">
+                            <LogOut size={16} /> {t.logout}
+                        </button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
