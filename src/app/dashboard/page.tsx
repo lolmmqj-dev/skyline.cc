@@ -99,6 +99,24 @@ export default function Dashboard() {
         setUser(normalizedUser);
         setAvatarPreview(normalizedUser.avatar_url || '');
         setLoading(false);
+
+        const token = localStorage.getItem('skyline_session');
+        if (token) {
+            fetch('/api/user/me', {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+                .then((res) => res.json())
+                .then((data) => {
+                    if (data?.success && data.user) {
+                        setUser(data.user);
+                        setAvatarPreview(data.user.avatar_url || '');
+                        localStorage.setItem('skyline_user', JSON.stringify(data.user));
+                    }
+                })
+                .catch(() => {
+                    // ignore
+                });
+        }
     }, [router]);
 
     const handleLogout = () => {
