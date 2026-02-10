@@ -148,7 +148,16 @@ export default function Dashboard() {
 
             if (data.success) {
                 setIsSuccess(true);
-                setMessage(t.messages.success);
+                const addedDays = Number(data.addedDays || 0);
+                const isLifetime = Boolean(data.lifetime);
+                const successMsg = isLifetime
+                    ? (lang === 'ru'
+                        ? 'Подписка активирована навсегда!'
+                        : 'Subscription activated forever!')
+                    : (lang === 'ru'
+                        ? `Подписка успешно активирована! (+${addedDays} дн.)`
+                        : `Subscription activated! (+${addedDays} days)`);
+                setMessage(successMsg);
                 const updatedUser = { ...user, subscription_status: 'active', subscription_expires: data.expiry };
                 setUser(updatedUser);
                 localStorage.setItem('skyline_user', JSON.stringify(updatedUser));

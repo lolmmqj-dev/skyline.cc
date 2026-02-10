@@ -32,8 +32,8 @@ export async function POST(req: Request) {
         const now = new Date();
         const currentExpiry = user.subscription_expires ? new Date(user.subscription_expires) : now;
         const baseDate = currentExpiry > now ? currentExpiry : now;
-        const days = keyRow.duration_days === 0 ? 3650 : keyRow.duration_days;
-        const newExpiry = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000);
+        const addedDays = keyRow.duration_days === 0 ? 3650 : keyRow.duration_days;
+        const newExpiry = new Date(baseDate.getTime() + addedDays * 24 * 60 * 60 * 1000);
 
         await supabaseAdmin
             .from('keys')
@@ -51,7 +51,9 @@ export async function POST(req: Request) {
         return NextResponse.json({
             success: true,
             message: 'Subscription activated!',
-            expiry: newExpiry.toISOString()
+            expiry: newExpiry.toISOString(),
+            addedDays,
+            lifetime: keyRow.duration_days === 0
         });
 
     } catch (error) {
