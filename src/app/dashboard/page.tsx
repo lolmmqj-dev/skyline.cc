@@ -222,7 +222,7 @@ export default function Dashboard() {
                                 placeholder={t.activationPlaceholder}
                                 value={key}
                                 onChange={(e) => setKey(e.target.value)}
-                                className="form-input pl-12 font-mono"
+                                className="form-input with-icon font-mono"
                             />
                         </div>
 

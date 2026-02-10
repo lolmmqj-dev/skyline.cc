@@ -235,7 +235,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                                         placeholder={t.placeholders.username}
                                         value={username}
                                         onChange={(e) => setUsername(e.target.value)}
-                                        className="form-input pl-12"
+                                        className="form-input with-icon"
                                         required
                                     />
                                 </div>
@@ -257,7 +257,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                                     placeholder={t.placeholders.email}
                                     value={email}
                                     onChange={handleEmailChange}
-                                    className={`form-input pl-12 ${
+                                    className={`form-input with-icon ${
                                         isValidEmail === true ? 'success' : isValidEmail === false ? 'error' : ''
                                     }`}
                                     required
@@ -276,7 +276,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                                     placeholder={t.placeholders.password}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="form-input pl-12"
+                                    className="form-input with-icon"
                                     required
                                 />
                             </div>
