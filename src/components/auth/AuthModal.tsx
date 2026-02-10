@@ -95,7 +95,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
     const [isValidEmail, setIsValidEmail] = useState<boolean | null>(null);
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-    const captchaRef = useRef<ReCAPTCHA | null>(null);
+    const captchaRef = useRef<InstanceType<typeof ReCAPTCHA> | null>(null);
 
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');

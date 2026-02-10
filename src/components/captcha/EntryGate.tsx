@@ -29,7 +29,7 @@ export default function EntryGate({ children }: { children: React.ReactNode }) {
     const { lang } = useLanguage();
     const t = copy[lang];
     const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-    const captchaRef = useRef<ReCAPTCHA | null>(null);
+    const captchaRef = useRef<InstanceType<typeof ReCAPTCHA> | null>(null);
 
     const [verified, setVerified] = useState(false);
     const [verifying, setVerifying] = useState(false);
