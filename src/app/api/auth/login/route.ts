@@ -6,7 +6,7 @@ import { getClientIp } from '@/lib/request';
 
 export async function POST(req: Request) {
     try {
-        const { email, password } = await req.json();
+        const { email, password, hwid } = await req.json();
 
         if (!email || !password) {
             return NextResponse.json({ success: false, message: 'Missing credentials' }, { status: 400 });
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
         const { data: user } = await supabaseAdmin
             .from('users')
-            .select('uid, email, username, password_hash, subscription_status, subscription_expires, is_banned, avatar_url')
+            .select('uid, email, username, password_hash, subscription_status, subscription_expires, is_banned, avatar_url, hwid')
             .eq('email', normalizedEmail)
             .maybeSingle();
 
@@ -55,9 +55,17 @@ export async function POST(req: Request) {
                 expires_at: expiresAt,
             });
 
+        const updates: { last_ip: string; hwid?: string } = { last_ip: ip };
+        if (typeof hwid === 'string') {
+            const trimmed = hwid.trim();
+            if (trimmed.length > 0) {
+                updates.hwid = trimmed.slice(0, 128);
+            }
+        }
+
         await supabaseAdmin
             .from('users')
-            .update({ last_ip: ip })
+            .update(updates)
             .eq('uid', user.uid);
 
         const { password_hash: _pw, ...safeUser } = user;

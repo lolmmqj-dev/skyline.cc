@@ -70,10 +70,6 @@ export default function RecentSignups() {
 
     return (
         <section className="container mx-auto px-4">
-            <div className="text-center mb-8">
-                <h2 className="text-2xl md:text-4xl font-bold text-white">{t.title}</h2>
-                <p className="text-gray-400 text-sm mt-2">{t.subtitle}</p>
-            </div>
 
             <div className="max-w-3xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
                 {items.length === 0 && (

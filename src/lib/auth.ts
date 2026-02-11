@@ -6,6 +6,7 @@ export type SessionUser = {
     email: string;
     username: string;
     avatar_url: string | null;
+    hwid: string | null;
     subscription_status: string;
     subscription_expires: string | null;
     is_banned: boolean;
@@ -34,7 +35,7 @@ export async function getSessionUser(req: Request): Promise<SessionUser | null> 
 
     const { data: user } = await supabaseAdmin
         .from('users')
-        .select('uid, email, username, avatar_url, subscription_status, subscription_expires, is_banned')
+        .select('uid, email, username, avatar_url, hwid, subscription_status, subscription_expires, is_banned')
         .eq('uid', session.user_uid)
         .maybeSingle();
 

@@ -65,9 +65,6 @@ export default function Dashboard() {
     const [key, setKey] = useState('');
     const [message, setMessage] = useState('');
     const [isSuccess, setIsSuccess] = useState(false);
-    const [avatarFile, setAvatarFile] = useState<File | null>(null);
-    const [avatarPreview, setAvatarPreview] = useState<string>('');
-    const [avatarMessage, setAvatarMessage] = useState('');
 
     useEffect(() => {
         const storedUser = localStorage.getItem('skyline_user');
@@ -98,7 +95,6 @@ export default function Dashboard() {
         };
 
         setUser(normalizedUser);
-        setAvatarPreview(normalizedUser.avatar_url || '');
         setLoading(false);
 
         const token = localStorage.getItem('skyline_session');
@@ -110,7 +106,6 @@ export default function Dashboard() {
                 .then((data) => {
                     if (data?.success && data.user) {
                         setUser(data.user);
-                        setAvatarPreview(data.user.avatar_url || '');
                         localStorage.setItem('skyline_user', JSON.stringify(data.user));
                     }
                 })
@@ -170,42 +165,6 @@ export default function Dashboard() {
         }
     };
 
-    const handleAvatarSave = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setAvatarMessage('');
-        if (!avatarFile) {
-            setAvatarMessage(lang === 'ru' ? 'Выберите файл' : 'Choose a file');
-            return;
-        }
-        try {
-            const token = localStorage.getItem('skyline_session');
-            const form = new FormData();
-            form.append('file', avatarFile);
-            const res = await fetch('/api/user/avatar', {
-                method: 'POST',
-                headers: {
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: form,
-            });
-            const data = await res.json();
-            if (data.success) {
-                const updatedUser = { ...user, avatar_url: data.avatarUrl };
-                setUser(updatedUser);
-                localStorage.setItem('skyline_user', JSON.stringify(updatedUser));
-                setAvatarFile(null);
-                if (avatarPreview && avatarPreview.startsWith('blob:')) {
-                    URL.revokeObjectURL(avatarPreview);
-                }
-                setAvatarPreview(data.avatarUrl);
-                setAvatarMessage(lang === 'ru' ? 'Аватар обновлен' : 'Avatar updated');
-            } else {
-                setAvatarMessage(data.message || (lang === 'ru' ? 'Ошибка' : 'Error'));
-            }
-        } catch {
-            setAvatarMessage(lang === 'ru' ? 'Ошибка сети' : 'Network error');
-        }
-    };
 
     if (loading || !user) {
         return <div className="min-h-screen bg-black flex items-center justify-center">{t.loading}</div>;
@@ -328,59 +287,6 @@ export default function Dashboard() {
                     </form>
                 </motion.div>
 
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.35 }}
-                    className="card-custom p-8 mt-8"
-                >
-                    <div className="flex items-center gap-4 mb-6">
-                        <div className="w-16 h-16 rounded-full overflow-hidden bg-white/10 flex items-center justify-center">
-                            {avatarPreview ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                            ) : (
-                                <span className="text-gray-500 text-sm">No Avatar</span>
-                            )}
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-bold">{lang === 'ru' ? 'Аватар' : 'Avatar'}</h2>
-                            <p className="text-gray-400 text-sm">
-                                {lang === 'ru'
-                                    ? 'Загрузите изображение с устройства (до 2 МБ).'
-                                    : 'Upload an image from your device (max 2 MB).'}
-                            </p>
-                        </div>
-                    </div>
-
-                    <form onSubmit={handleAvatarSave} className="max-w-md">
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0] || null;
-                                setAvatarFile(file);
-                                if (avatarPreview && avatarPreview.startsWith('blob:')) {
-                                    URL.revokeObjectURL(avatarPreview);
-                                }
-                                if (file) {
-                                    setAvatarPreview(URL.createObjectURL(file));
-                                } else {
-                                    setAvatarPreview(user.avatar_url || '');
-                                }
-                            }}
-                            className="form-input mb-3"
-                        />
-                        <button className="btn-primary w-full" disabled={!avatarFile}>
-                            {lang === 'ru' ? 'Сохранить' : 'Save'}
-                        </button>
-                        {avatarMessage && (
-                            <div className="mt-3 text-sm text-gray-300 text-center">
-                                {avatarMessage}
-                            </div>
-                        )}
-                    </form>
-                </motion.div>
             </div>
         </div>
     );

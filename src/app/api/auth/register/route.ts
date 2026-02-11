@@ -90,7 +90,7 @@ export async function POST(req: Request) {
                 subscription_expires: null,
                 last_ip: ip,
             })
-            .select('uid, email, username, subscription_status, subscription_expires, avatar_url')
+            .select('uid, email, username, subscription_status, subscription_expires, avatar_url, hwid')
             .single();
 
         if (createError || !createdUser) {

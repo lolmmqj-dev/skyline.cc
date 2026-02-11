@@ -9,6 +9,13 @@ const LIMITS: Array<{ prefix: string; max: number }> = [
     { prefix: '/api/keys', max: 30 },
 ];
 
+const CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+};
+
 type Bucket = {
     timestamps: number[];
 };
@@ -39,6 +46,10 @@ function isRateLimited(key: string, max: number) {
 }
 
 export function middleware(req: NextRequest) {
+    if (req.method === 'OPTIONS') {
+        return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+    }
+
     const ip = getClientIp(req);
     const path = req.nextUrl.pathname;
     const limit = getLimit(path);
@@ -52,12 +63,17 @@ export function middleware(req: NextRequest) {
                 headers: {
                     'content-type': 'application/json',
                     'retry-after': '60',
+                    ...CORS_HEADERS,
                 },
             }
         );
     }
 
-    return NextResponse.next();
+    const res = NextResponse.next();
+    Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+        res.headers.set(key, value);
+    });
+    return res;
 }
 
 export const config = {
